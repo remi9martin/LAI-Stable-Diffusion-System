@@ -140,3 +140,4 @@ node_modules
 *.rdb
 *.webm
 *hars
+*.db
