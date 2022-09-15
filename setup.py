@@ -28,7 +28,7 @@ def _load_requirements(
 
 
 setup(
-    name="lightning_stable_diffusion",
+    name="stable_diffusion",
     version="0.0.1",
     description="⚡ Stable Diffusion with Lightning ⚡",
     long_description="⚡ Stable Diffusion with Lightning ⚡",

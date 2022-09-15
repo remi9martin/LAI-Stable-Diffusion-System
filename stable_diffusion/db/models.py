@@ -50,3 +50,4 @@ class PromptConfig(SQLModel, table=True):
     style: str
     num_images: int
     stage: str = Stage.NOT_STARTED
+    job_id: Optional[str] = None

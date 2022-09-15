@@ -33,7 +33,7 @@ class StableDiffusionFlow(LightningFlow):
             if not self.ready:
                 for idx in range(self.parallel_jobs):
                     print(f"Creating job {idx}")
-                    self.jobs[str(idx)] = StableDiffusionJob()
+                    self.jobs[str(idx)] = StableDiffusionJob(self.db, str(idx))
                 self.ready = True
             for prompt, style in self.prompt_config:
                 config = PromptConfig(
@@ -55,34 +55,30 @@ class StableDiffusionFlow(LightningFlow):
                 for idx, job in self.jobs.items()
                 if not job.is_running
             ]
-            tasks = [[config.id, config.num_images] for config in not_started_configs]
 
-            per_job = len(not_started_configs) // self.parallel_jobs
+            def split_tasks(tasks, num_jobs):
+                k, m = divmod(len(tasks), num_jobs)
+                return (
+                    tasks[i * k + min(i, m) : (i + 1) * k + min(i + 1, m)]
+                    for i in range(num_jobs)
+                )
 
-            job_tasks = []
-            jobs = [idx for idx, job in self.jobs.items() if not job.is_running]
+            assigned_tasks = split_tasks(not_started_configs, len(self.jobs.keys()))
+            print("Assigned Tasks", assigned_tasks)
 
-            for idx, config in enumerate(not_started_configs):
-                if len(jobs) == 1:
-                    job_idx = jobs.pop(0)
-                    self.jobs[job_idx].run(not_started_configs[idx:])
-                    for task in not_started_configs[idx:]:
-                        task.stage = Stage.RUNNING
-                        self.db.put(task)
-                    break
-                elif idx % per_job == 0:
-                    job_idx = jobs.pop(0)
-                    job_tasks.append(config)
-                    self.jobs[job_idx].run(job_tasks)
+            for idx, config_list in enumerate(assigned_tasks):
+                if len(config_list) == 0:
+                    continue
+                print(f"Assigning {config_list} tasks to job {idx}")
+                for config in config_list:
                     config.stage = Stage.RUNNING
+                    config.job_id = str(idx)
                     self.db.put(config)
-                    job_tasks = []
-                else:
-                    job_tasks.append(config)
+                    if not self.jobs[str(idx)].is_running:
+                        self.jobs[str(idx)].run()
 
             print("Not started configs found")
             print(self.jobs_sack)
-            print(tasks)
 
     @property
     def db(self) -> DatabaseConnector:

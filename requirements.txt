@@ -1,3 +1,4 @@
 lightning
 streamlit
 sqlmodel
+diffusers==3.0.0
