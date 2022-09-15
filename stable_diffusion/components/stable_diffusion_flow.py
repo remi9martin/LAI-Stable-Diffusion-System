@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional
 
 import streamlit as st
@@ -7,13 +8,14 @@ from lightning.app.structures import Dict
 
 from stable_diffusion.components.stable_diffusion_job import StableDiffusionJob
 from stable_diffusion.db import DatabaseConnector
-from stable_diffusion.db.models import PromptConfig
+from stable_diffusion.db.models import JobsQueue, PromptConfig
 from stable_diffusion.utilities.enum import Stage
 
 
 class StableDiffusionFlow(LightningFlow):
 
-    model = PromptConfig
+    prompt_model = PromptConfig
+    queue_model = JobsQueue
 
     def __init__(self):
         super().__init__()
@@ -23,6 +25,8 @@ class StableDiffusionFlow(LightningFlow):
         self.jobs_sack: list = []
         self._database = None
         self.ready = False
+        self.prompts: Optional[list] = None
+        self.styles: Optional[list] = None
         self.prompt_config: Optional[list] = None
         self.num_images: Optional[int] = None
 
@@ -35,15 +39,32 @@ class StableDiffusionFlow(LightningFlow):
                     print(f"Creating job {idx}")
                     self.jobs[str(idx)] = StableDiffusionJob(self.db, str(idx))
                 self.ready = True
+
+            # Add to the JobsQueue Table
+            queue_uuid = str(uuid.uuid4())
+            jobs_queue_config = JobsQueue(
+                queue_id=queue_uuid,
+                prompts=self.prompts,
+                styles=self.styles,
+                num_images=self.num_images,
+            )
+            self.db.post(jobs_queue_config)
+
+            print(jobs_queue_config)
+
             for prompt, style in self.prompt_config:
-                config = PromptConfig(
-                    prompt=prompt, style=style, num_images=self.num_images
+                self.db.post(
+                    PromptConfig(
+                        queue_id=queue_uuid,
+                        prompt=prompt,
+                        style=style,
+                        num_images=self.num_images,
+                    )
                 )
-                self.db.post(config)
             self.prompt_config = None
             self.num_images = None
 
-        db_configs = self.db.get(self.model)
+        db_configs = self.db.get(self.prompt_model)
         not_started_configs = [
             config for config in db_configs if config.stage == Stage.NOT_STARTED
         ]
@@ -84,7 +105,9 @@ class StableDiffusionFlow(LightningFlow):
     def db(self) -> DatabaseConnector:
         if self._database is None:
             assert self.db_url is not None
-            self._database = DatabaseConnector(self.model, self.db_url + "/general/")
+            self._database = DatabaseConnector(
+                self.prompt_model, self.db_url + "/general/"
+            )
         return self._database
 
     def configure_layout(self):
@@ -93,7 +116,7 @@ class StableDiffusionFlow(LightningFlow):
 
 def render_diffusion_flow(state):
 
-    st.title("Welcome to Stable Diffusion System Demo! :rocket:")
+    st.title("Stable Diffusion Studio App! :rocket:")
 
     prompts = st.text_input("Enter your prompt here", value="Alan Turing")
 
@@ -113,6 +136,8 @@ def render_diffusion_flow(state):
     if dream:
         prompts = prompts.split(",")
 
+        state.prompts = prompts
+        state.styles = styles
         state.prompt_config = [
             (prompt, style) for prompt in prompts for style in styles
         ]

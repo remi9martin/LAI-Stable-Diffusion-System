@@ -1,9 +1,9 @@
 import inspect
 import sys
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Column, Field, SQLModel
 
 from stable_diffusion.utilities.enum import Stage
 
@@ -46,8 +46,22 @@ class GeneralModel(BaseModel):
 class PromptConfig(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    queue_id: str
     prompt: str
     style: str
     num_images: int
     stage: str = Stage.NOT_STARTED
     job_id: Optional[str] = None
+
+
+class JobsQueue(SQLModel, table=True):
+
+    queue_id: str = Field(..., primary_key=True)
+    prompts: List[str] = Field(sa_column=Column(JSON))
+    styles: List[str] = Field(sa_column=Column(JSON))
+    stage: str = Stage.NOT_STARTED
+    num_images: int
+
+    # Needed for Column(JSON)
+    class Config:
+        arbitrary_types_allowed = True

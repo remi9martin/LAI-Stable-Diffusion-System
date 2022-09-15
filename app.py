@@ -3,7 +3,7 @@ import os
 from lightning import LightningApp, LightningFlow
 from lightning.app.storage import Drive
 
-from stable_diffusion import StableDiffusionFlow
+from stable_diffusion import JobsQueueFlow, StableDiffusionFlow
 from stable_diffusion.db import Database
 
 
@@ -18,6 +18,9 @@ class MainFlow(LightningFlow):
         # 2: Stable Diffusion Flow for prompts and styles
         self.dream = StableDiffusionFlow()
 
+        # 3: Jobs Queue Flow to track the progress
+        self.jobs_queue_progress = JobsQueueFlow()
+
         # 2: Controller
         # self.jobs_controller = JobsController(self.drive)
 
@@ -25,7 +28,9 @@ class MainFlow(LightningFlow):
         # self.file_server = FileServer(self.drive)
 
         # 4: Create the database.
-        self.db = Database(models=[self.dream.model])
+        self.db = Database(
+            models=[self.dream.prompt_model, self.jobs_queue_progress.model]
+        )
 
         self.ready = False
 
@@ -42,12 +47,13 @@ class MainFlow(LightningFlow):
             self.ready = True
 
         self.dream.run(self.db.db_url)
+        self.jobs_queue_progress.run(self.db.db_url)
 
     def configure_layout(self):
         tab_1 = {"name": "Dream", "content": self.dream}
+        tab_2 = {"name": "Jobs Queue", "content": self.jobs_queue_progress}
         # tab_1 = {"name": "Visualize", "content": "Tab 2 content"}
-        # tab_1 = {"name": "Jobs Queue", "content": "Tab 3 content"}
-        return [tab_1]
+        return [tab_1, tab_2]
 
 
 app = LightningApp(MainFlow())

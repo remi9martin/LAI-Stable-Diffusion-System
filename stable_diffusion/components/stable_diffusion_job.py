@@ -2,7 +2,11 @@ import os
 import tarfile
 import urllib
 
+import numpy as np
+import torch
 from lightning import CloudCompute, LightningWork
+from PIL import Image
+from torch import autocast
 
 from stable_diffusion.utilities.enum import Stage
 
@@ -30,8 +34,40 @@ class StableDiffusionJob(LightningWork):
 
         print(job_configs)
         for config in job_configs:
+            results = self.predict(config)
             config.stage = Stage.SUCCEEDED
             self._db.put(config)
+            print(results)
+
+    def predict(self, config):
+        prompt = config.prompt + " " + config.style
+        prompts = [prompt] * config.num_images
+        pil_results = []
+        height, width = 512, 512
+
+        with autocast("cuda"):
+            # predicting in chunks to save cuda out of memory error
+            chunk_size = 3
+            for i in range(0, config.num_images, chunk_size):
+                if torch.cuda.is_available():
+                    pil_results.extend(
+                        self._model(
+                            prompts[i : i + chunk_size],
+                            height=height,
+                            width=width,
+                        )["sample"]
+                    )
+                else:
+                    pil_results.extend(
+                        [
+                            Image.fromarray(
+                                np.random.randint(
+                                    0, 255, (height, width, 3), dtype="uint8"
+                                )
+                            )
+                        ]
+                    )
+        return pil_results
 
     @staticmethod
     def download_weights(url: str, target_folder: str):
