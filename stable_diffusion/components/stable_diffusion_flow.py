@@ -1,3 +1,4 @@
+import time
 import uuid
 from typing import Optional
 
@@ -10,6 +11,7 @@ from stable_diffusion.components.stable_diffusion_job import StableDiffusionJob
 from stable_diffusion.db import DatabaseConnector
 from stable_diffusion.db.models import JobsQueue, PromptConfig
 from stable_diffusion.utilities.enum import Stage
+from stable_diffusion.utilities.utils import TIME_FORMAT
 
 
 class StableDiffusionFlow(LightningFlow):
@@ -42,11 +44,13 @@ class StableDiffusionFlow(LightningFlow):
 
             # Add to the JobsQueue Table
             queue_uuid = str(uuid.uuid4())
+            started_time = time.strftime(TIME_FORMAT)
             jobs_queue_config = JobsQueue(
                 queue_id=queue_uuid,
                 prompts=self.prompts,
                 styles=self.styles,
                 num_images=self.num_images,
+                started_time=started_time,
             )
             self.db.post(jobs_queue_config)
 
@@ -116,7 +120,7 @@ class StableDiffusionFlow(LightningFlow):
 
 def render_diffusion_flow(state):
 
-    st.title("Stable Diffusion Studio App! :rocket:")
+    st.title("Stable Diffusion Studio App! :frame_with_picture: :zap:")
 
     prompts = st.text_input("Enter your prompt here", value="Alan Turing")
 

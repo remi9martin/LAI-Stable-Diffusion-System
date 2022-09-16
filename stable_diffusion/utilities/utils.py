@@ -15,3 +15,6 @@ def get_primary_key(model_type: Type[SQLModel]) -> str:
         )
 
     return primary_keys[0].name
+
+
+TIME_FORMAT = "%Y-%m-%d %H:%M:%S"

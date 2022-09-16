@@ -61,6 +61,8 @@ class JobsQueue(SQLModel, table=True):
     styles: List[str] = Field(sa_column=Column(JSON))
     stage: str = Stage.NOT_STARTED
     num_images: int
+    started_time: str
+    finished_time: Optional[str] = None
 
     # Needed for Column(JSON)
     class Config:
